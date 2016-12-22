@@ -9,40 +9,6 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 )
 
-func basicAuth(user string, pwd string) string {
-	// var username string = "9E7544ADF1AA1E188FBC"
-	// var passwd string = "nfBa3HwdruPxwGtHrpdb3sSkmn68bKCuquSLZKTv"
-	var username string = user
-	var passwd string = pwd
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://54.255.182.226:8080/v2-beta/accounts", nil)
-	req.SetBasicAuth(username, passwd)
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	bodyText, err := ioutil.ReadAll(resp.Body)
-	// s := string(bodyText)
-	// fmt.Printf(string(bodyText))
-	js, _ := simplejson.NewJson(bodyText)
-	authorized, _ := js.Get("message").String()
-	if authorized == "Unauthorized" {
-		return "Error 401 unauthorized"
-	} else {
-		jsq, _ := simplejson.NewJson(bodyText)
-		// fmt.Print(bodyText)
-		accountID, _ := jsq.Get("data").GetIndex(0).Get("id").String()
-		return accountID
-	}
-
-	// js := gojson.Json(s).Get("data")
-	// js, err := simplejson.NewJson(bodyText)
-	// temp, _ := js.Get("data").Get("id").String()
-	// temp, _ := js.String()
-	// fmt.Printf("value")
-
-}
-
 func getValue(path string, token string) string {
 	client := &http.Client{}
 	requestURL := "http://54.255.182.226:8080/v2-beta/" + path
@@ -93,20 +59,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 		}
 
-	} else if r.Method == "POST" {
-		if r.URL.Path == "/post" {
-			result, _ := ioutil.ReadAll(r.Body)
-			r.Body.Close()
-			fmt.Printf("POST %s\n", result)
-			token, _ := simplejson.NewJson(result)
-			usr, _ := token.Get("usr").String()
-			pwd, _ := token.Get("pwd").String()
-			// fmt.Printf(usr + "" + pwd)
-			accountID := basicAuth(usr, pwd)
-			// fmt.Printf("result" + accountID)
-			// jsonObject, _ := json.Marshal(temp)
-			fmt.Fprintf(w, "%q\n", accountID)
-		}
 	}
 }
 
