@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -8,6 +9,10 @@ import (
 
 	simplejson "github.com/bitly/go-simplejson"
 )
+
+type authorizedID struct {
+	Name map[string][]string
+}
 
 func getValue(path string, token string) string {
 	client := &http.Client{}
@@ -33,37 +38,46 @@ func getValue(path string, token string) string {
 }
 func handler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-
 		if r.URL.Path == "/v1-auth-filter/validateAuthToken" {
 
 			cookie, err := r.Cookie("token")
 			if err == nil {
-				fmt.Fprintln(w, "Name:", cookie.Name)
-				fmt.Fprintln(w, "Value:", cookie.Value)
+				// fmt.Fprintln(w, "Name:", cookie.Name)
+				// fmt.Fprintln(w, "Value:", cookie.Value)
 				if cookie.Value != "" {
 					accountID := getValue("accounts", cookie.Value)
 					projectID := getValue("projects", cookie.Value)
-					fmt.Fprintf(w, "X-API-Account-Id:%q X-API-Project-Id:%q\n", accountID, projectID)
+					// fmt.Fprintf(w, "X-API-Account-Id:%q X-API-Project-Id:%q\n", accountID, projectID)
 					if accountID != "" && projectID != "" {
-						w.Header().Add("X-API-Account-Id", accountID)
-						w.Header().Add("X-API-Project-Id", projectID)
-						w.WriteHeader(http.StatusOK)
-					} else if accountID != "Unauthorized" && projectID != "Unauthorized" {
-						w.WriteHeader(http.StatusUnauthorized)
+						var result authorizedID
+						result = map[string][]string{
+							"header": []string{"", ""},
+                            "X-API-Account-Id": []string{accountID},
+                            "X-API-Project-Id": []string{projectID},
+                    }}
+						body, err := json.Marshal(result)
+						if err != nil {
+							panic(err.Error())
+						}
+						body2, _ := body.String()
+						fmt.Fprintln(w, "Value:", body2)
+						w.WriteHeader(200)
 					}
-				}
 
-			} else {
-				w.WriteHeader(http.StatusBadRequest)
+					// w.Header().Add("X-API-Account-Id", accountID)
+					// w.Header().Add("X-API-Project-Id", projectID)
+
+				} else if accountID != "Unauthorized" && projectID != "Unauthorized" {
+					w.WriteHeader(401)
+				}
 			}
 
 		}
-
 	}
 }
 
 func main() {
 	http.HandleFunc("/", handler)
-	log.Fatal(http.ListenAndServe(":8000", nil))
+	log.Fatal(http.ListenAndServe(":8011", nil))
 
 }
