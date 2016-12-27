@@ -10,9 +10,10 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 )
 
-type authorizedID struct {
-	Name map[string][]string
-}
+// type authorizedID struct {
+// 	account string `json:"X-API-Account-Id"`
+// 	project string `json:"X-API-Project-Id"`
+// }
 
 func getValue(path string, token string) string {
 	client := &http.Client{}
@@ -36,42 +37,40 @@ func getValue(path string, token string) string {
 	}
 
 }
-func handler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		if r.URL.Path == "/v1-auth-filter/validateAuthToken" {
 
+func handler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		if r.URL.Path == "/v1-auth-filter/validateAuthToken" {
 			cookie, err := r.Cookie("token")
 			if err == nil {
-				// fmt.Fprintln(w, "Name:", cookie.Name)
-				// fmt.Fprintln(w, "Value:", cookie.Value)
+				fmt.Fprintln(w, "Name:", cookie.Name)
+				fmt.Fprintln(w, "Value:", cookie.Value)
 				if cookie.Value != "" {
 					accountID := getValue("accounts", cookie.Value)
 					projectID := getValue("projects", cookie.Value)
-					// fmt.Fprintf(w, "X-API-Account-Id:%q X-API-Project-Id:%q\n", accountID, projectID)
+
 					if accountID != "" && projectID != "" {
-						var result authorizedID
-						result = map[string][]string{
-							"header": []string{"", ""},
-                            "X-API-Account-Id": []string{accountID},
-                            "X-API-Project-Id": []string{projectID},
-                    }}
-						body, err := json.Marshal(result)
-						if err != nil {
-							panic(err.Error())
+						var m map[string][]string = make(map[string][]string)
+						m["headers"] = []string{"header"}
+						m["X-API-Project-Id"] = []string{projectID}
+						m["X-API-Account-Id"] = []string{accountID}
+						if bs, err := json.Marshal(m); err != nil {
+							panic(err)
+						} else {
+							//result --> {"C":"No.3","Go":"No.1","Java":"No.2"}
+							fmt.Println(string(bs))
+							fmt.Fprintln(w, string(bs))
 						}
-						body2, _ := body.String()
-						fmt.Fprintln(w, "Value:", body2)
-						w.WriteHeader(200)
+					} else if accountID != "Unauthorized" && projectID != "Unauthorized" {
+						w.WriteHeader(401)
 					}
 
 					// w.Header().Add("X-API-Account-Id", accountID)
 					// w.Header().Add("X-API-Project-Id", projectID)
 
-				} else if accountID != "Unauthorized" && projectID != "Unauthorized" {
-					w.WriteHeader(401)
 				}
-			}
 
+			}
 		}
 	}
 }
