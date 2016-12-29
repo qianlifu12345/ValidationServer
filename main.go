@@ -10,14 +10,11 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 )
 
-// type authorizedID struct {
-// 	account string `json:"X-API-Account-Id"`
-// 	project string `json:"X-API-Project-Id"`
-// }
-
-func getValue(path string, token string) string {
+//get the projectID and accountID from rancher API
+func getValue(host string, path string, token string) string {
+	result := ""
 	client := &http.Client{}
-	requestURL := "http://54.255.182.226:8080/v2-beta/" + path
+	requestURL := host + "v2-beta/" + path
 	req, err := http.NewRequest("GET", requestURL, nil)
 	cookie := http.Cookie{Name: "token", Value: token}
 	req.AddCookie(&cookie)
@@ -28,14 +25,22 @@ func getValue(path string, token string) string {
 	bodyText, err := ioutil.ReadAll(resp.Body)
 	js, _ := simplejson.NewJson(bodyText)
 	authorized, _ := js.Get("message").String()
+
 	if authorized == "Unauthorized" {
-		return "Unauthorized"
+		result = "Unauthorized"
 	} else {
-		jsq, _ := simplejson.NewJson(bodyText)
-		id, _ := jsq.Get("data").GetIndex(0).Get("id").String()
-		return id
+		jsonBody, _ := simplejson.NewJson(bodyText)
+		id, err := jsonBody.Get("data").GetIndex(0).Get("id").String()
+		if err != nil {
+			log.Fatal(err)
+			result = "No id found"
+		} else {
+			result = id
+		}
+
 	}
 
+	return result
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -43,30 +48,29 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1-auth-filter/validateAuthToken" {
 			cookie, err := r.Cookie("token")
 			if err == nil {
-				fmt.Fprintln(w, "Name:", cookie.Name)
-				fmt.Fprintln(w, "Value:", cookie.Value)
+				//check if the token value is empty or not
 				if cookie.Value != "" {
-					accountID := getValue("accounts", cookie.Value)
-					projectID := getValue("projects", cookie.Value)
-
+					accountID := getValue("http://54.255.182.226:8080/", "accounts", cookie.Value)
+					projectID := getValue("http://54.255.182.226:8080/", "projects", cookie.Value)
+					//check if the accountID or projectID is empty
 					if accountID != "" && projectID != "" {
-						var m map[string][]string = make(map[string][]string)
-						m["headers"] = []string{"header"}
-						m["X-API-Project-Id"] = []string{projectID}
-						m["X-API-Account-Id"] = []string{accountID}
-						if bs, err := json.Marshal(m); err != nil {
-							panic(err)
+						if accountID == "Unauthorized" && projectID == "Unauthorized" {
+							w.WriteHeader(401)
 						} else {
-							//result --> {"C":"No.3","Go":"No.1","Java":"No.2"}
-							fmt.Println(string(bs))
-							fmt.Fprintln(w, string(bs))
+							//construct the responseBody
+							var responseBody map[string][]string = make(map[string][]string)
+							for k, v := range r.Header {
+								responseBody[k] = v
+							}
+							responseBody["X-API-Project-Id"] = []string{projectID}
+							responseBody["X-API-Account-Id"] = []string{accountID}
+							if responseBodyString, err := json.Marshal(responseBody); err != nil {
+								panic(err)
+							} else {
+								fmt.Fprintln(w, string(responseBodyString))
+							}
 						}
-					} else if accountID != "Unauthorized" && projectID != "Unauthorized" {
-						w.WriteHeader(401)
 					}
-
-					// w.Header().Add("X-API-Account-Id", accountID)
-					// w.Header().Add("X-API-Project-Id", projectID)
 
 				}
 
