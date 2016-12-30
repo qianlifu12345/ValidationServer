@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 
+	"github.com/Sirupsen/logrus"
 	simplejson "github.com/bitly/go-simplejson"
+	"github.com/rancher/rancher-auth-filter-service/manager"
 )
 
 const headerForwardedProto string = "X-Forwarded-Proto"
@@ -18,8 +19,9 @@ func ValidationHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		//check if the token value is empty or not
 		if cookie.Value != "" {
-			accountID := getValue("http://54.255.182.226:8080/", "accounts", cookie.Value)
-			projectID := getValue("http://54.255.182.226:8080/", "projects", cookie.Value)
+			logrus.Infof("token:" + cookie.Value)
+			accountID := getValue(manager.Url, "accounts", cookie.Value)
+			projectID := getValue(manager.Url, "projects", cookie.Value)
 			//check if the accountID or projectID is empty
 			if accountID != "" && projectID != "" {
 				if accountID == "Unauthorized" && projectID == "Unauthorized" {
@@ -58,7 +60,7 @@ func getValue(host string, path string, token string) string {
 	req.AddCookie(&cookie)
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 	bodyText, err := ioutil.ReadAll(resp.Body)
 	js, _ := simplejson.NewJson(bodyText)
@@ -70,7 +72,7 @@ func getValue(host string, path string, token string) string {
 		jsonBody, _ := simplejson.NewJson(bodyText)
 		id, err := jsonBody.Get("data").GetIndex(0).Get("id").String()
 		if err != nil {
-			log.Fatal(err)
+			logrus.Info(err)
 			result = "No id found"
 		} else {
 			result = id
