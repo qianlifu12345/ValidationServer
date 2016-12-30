@@ -1,86 +1,47 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"log"
 	"net/http"
+	"os"
 
-	simplejson "github.com/bitly/go-simplejson"
+	log "github.com/Sirupsen/logrus"
+	"github.com/rancher/rancher-auth-filter-service/service"
+	"github.com/urfave/cli"
 )
 
-//get the projectID and accountID from rancher API
-func getValue(host string, path string, token string) string {
-	result := ""
-	client := &http.Client{}
-	requestURL := host + "v2-beta/" + path
-	req, err := http.NewRequest("GET", requestURL, nil)
-	cookie := http.Cookie{Name: "token", Value: token}
-	req.AddCookie(&cookie)
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	bodyText, err := ioutil.ReadAll(resp.Body)
-	js, _ := simplejson.NewJson(bodyText)
-	authorized, _ := js.Get("message").String()
-
-	if authorized == "Unauthorized" {
-		result = "Unauthorized"
-	} else {
-		jsonBody, _ := simplejson.NewJson(bodyText)
-		id, err := jsonBody.Get("data").GetIndex(0).Get("id").String()
-		if err != nil {
-			log.Fatal(err)
-			result = "No id found"
-		} else {
-			result = id
-		}
-
-	}
-
-	return result
-}
-
-func handler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
-		if r.URL.Path == "/v1-auth-filter/validateAuthToken" {
-			cookie, err := r.Cookie("token")
-			if err == nil {
-				//check if the token value is empty or not
-				if cookie.Value != "" {
-					accountID := getValue("http://54.255.182.226:8080/", "accounts", cookie.Value)
-					projectID := getValue("http://54.255.182.226:8080/", "projects", cookie.Value)
-					//check if the accountID or projectID is empty
-					if accountID != "" && projectID != "" {
-						if accountID == "Unauthorized" && projectID == "Unauthorized" {
-							w.WriteHeader(401)
-						} else {
-							//construct the responseBody
-							var responseBody map[string][]string = make(map[string][]string)
-							for k, v := range r.Header {
-								responseBody[k] = v
-							}
-							responseBody["X-API-Project-Id"] = []string{projectID}
-							responseBody["X-API-Account-Id"] = []string{accountID}
-							if responseBodyString, err := json.Marshal(responseBody); err != nil {
-								panic(err)
-							} else {
-								fmt.Fprintln(w, string(responseBodyString))
-							}
-						}
-					}
-
-				}
-
-			}
-		}
-	}
-}
+var VERSION = "v0.1.0-dev"
+var url = "http://54.255.182.226"
+var port = "8080"
 
 func main() {
-	http.HandleFunc("/", handler)
-	log.Fatal(http.ListenAndServe(":8011", nil))
+	log.Infof("Starting authantication filtering Service")
+	app := cli.NewApp()
+	app.Name = "rancher-auth-filter-service"
+	app.Version = "v0.1.0-dev"
+	app.Usage = "Rancher authantication Filter Service"
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "rancherUrl",
+			Value: "http://54.255.182.226",
+			Usage: "Rancher server url",
+		},
+		cli.StringFlag{
+			Name:  "localport",
+			Value: "8080",
+			Usage: "Local server port ",
+		},
+	}
 
+	app.Action = func(c *cli.Context) error {
+		url = c.String("url")
+		port = c.String("port")
+		return nil
+	}
+
+	app.Run(os.Args)
+
+	router := service.NewRouter()
+	http.Handle("/", router)
+	serverString := ":" + port
+	log.Fatal(http.ListenAndServe(serverString, nil))
 }
