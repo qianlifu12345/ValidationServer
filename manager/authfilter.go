@@ -3,11 +3,13 @@ package manager
 import (
 	"os"
 
+	"fmt"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
-var Url = "http://54.255.182.226"
+var Url = "http://54.255.182.226:8080/"
 var Port = "8080"
 
 //GetCommand is to get the rancher server url and local port
@@ -20,7 +22,7 @@ func GetCommand() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "rancherUrl",
-			Value: "http://54.255.182.226",
+			Value: "http://54.255.182.226:8080/",
 			Usage: "Rancher server url",
 		},
 		cli.StringFlag{
@@ -32,7 +34,9 @@ func GetCommand() {
 	app.Action = func(c *cli.Context) error {
 		Url = c.String("rancherUrl")
 		Port = c.String("localport")
-		logrus.Infof("URL:" + Url + "Port:" + Port)
+		logrus.Infof("URL:" + Url + "LocalPort:" + Port)
+		// logrus.Infof(c.NArg)
+		fmt.Println(c.NArg())
 		return nil
 	}
 
