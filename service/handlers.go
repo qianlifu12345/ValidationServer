@@ -23,8 +23,8 @@ func ValidationHandler(w http.ResponseWriter, r *http.Request) {
 			accountID := getValue(manager.Url, "accounts", cookie.Value)
 			projectID := getValue(manager.Url, "projects", cookie.Value)
 			//check if the accountID or projectID is empty
-			if accountID != "" && projectID != "" {
-				if accountID == "Unauthorized" && projectID == "Unauthorized" {
+			if accountID[0] != "" && projectID[0] != "" {
+				if accountID[0] == "Unauthorized" && projectID[0] == "Unauthorized" {
 					w.WriteHeader(401)
 				} else {
 					//construct the responseBody
@@ -32,8 +32,8 @@ func ValidationHandler(w http.ResponseWriter, r *http.Request) {
 					for k, v := range r.Header {
 						headerBody[k] = v
 					}
-					headerBody["X-API-Project-Id"] = []string{projectID}
-					headerBody["X-API-Account-Id"] = []string{accountID}
+					headerBody["X-API-Project-Id"] = projectID
+					headerBody["X-API-Account-Id"] = accountID
 					var responseBody map[string]map[string][]string = make(map[string]map[string][]string)
 					responseBody["headers"] = headerBody
 					//convert the map to JSON format
@@ -51,8 +51,8 @@ func ValidationHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //get the projectID and accountID from rancher API
-func getValue(host string, path string, token string) string {
-	result := ""
+func getValue(host string, path string, token string) []string {
+	var result []string
 	client := &http.Client{}
 	requestURL := host + "v2-beta/" + path
 	req, err := http.NewRequest("GET", requestURL, nil)
@@ -67,15 +67,20 @@ func getValue(host string, path string, token string) string {
 	authorized, _ := js.Get("message").String()
 
 	if authorized == "Unauthorized" {
-		result = "Unauthorized"
+		result = []string{"Unauthorized"}
 	} else {
+		var id string
 		jsonBody, _ := simplejson.NewJson(bodyText)
-		id, err := jsonBody.Get("data").GetIndex(0).Get("id").String()
-		if err != nil {
-			logrus.Info(err)
-			result = "No id found"
-		} else {
-			result = id
+		dataLenth := len(jsonBody.Get("data").MustArray())
+		for i := 0; i < dataLenth; i++ {
+			id, err = jsonBody.Get("data").GetIndex(i).Get("id").String()
+
+			if err != nil {
+				logrus.Info(err)
+				result = []string{"NotFindId"}
+			} else {
+				result = append(result, id)
+			}
 		}
 
 	}
